@@ -1,0 +1,15 @@
+# 本地环境配置 (包含 API Key, 不上传)
+.env
+
+# Python 缓存
+__pycache__/
+*.pyc
+*.pyo
+
+# 向量数据库缓存
+data/chroma/
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
