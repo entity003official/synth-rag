@@ -3,4 +3,3 @@ markdown>=3.5
 rank-bm25>=0.2
 jieba>=0.42
 scikit-learn>=1.0
-waitress>=2.1
