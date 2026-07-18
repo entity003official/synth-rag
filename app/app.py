@@ -40,9 +40,15 @@ body{font-family:-apple-system,"Segoe UI","Noto Sans SC",sans-serif;background:#
 header{background:#1a1a22;padding:12px 20px;border-bottom:1px solid #2a2a35;display:flex;align-items:center;gap:12px;flex-shrink:0}
 header h1{font-size:18px;font-weight:600}
 header span{color:#888;font-size:12px}
+.mode-switcher{display:flex;gap:4px;background:#0f0f12;border-radius:8px;padding:3px;margin:0 12px}
+.mode-btn{background:transparent;border:none;color:#666;padding:5px 14px;border-radius:6px;cursor:pointer;font-size:12px;transition:all .15s;white-space:nowrap}
+.mode-btn:hover{color:#aaa}
+.mode-btn.active{background:#2a2a35;color:#e0e0e0}
 .settings-btn{margin-left:auto;background:#2a2a35;border:none;color:#aaa;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px}
 .settings-btn:hover{background:#3a3a45;color:#fff}
 .main{display:flex;flex:1;overflow:hidden}
+#adsrMode{flex:1;display:none;background:#0a0a0f;overflow:hidden}
+#adsrMode iframe{width:100%;height:100%;border:none;display:block}
 
 /* 设置面板 */
 .modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:100;align-items:center;justify-content:center}
@@ -104,6 +110,10 @@ header span{color:#888;font-size:12px}
 <header>
   <h1>🎛️ 合成器助手</h1>
   <span>RAG 问答 · 知识库 296 条</span>
+  <div class="mode-switcher">
+    <button class="mode-btn active" data-mode="chat" onclick="switchMode('chat')">💬 问答</button>
+    <button class="mode-btn" data-mode="adsr" onclick="switchMode('adsr')">📊 ADSR</button>
+  </div>
   <button class="settings-btn" onclick="openSettings()">⚙️ 设置</button>
 </header>
 
@@ -127,6 +137,7 @@ header span{color:#888;font-size:12px}
 </div>
 
 <div class="main">
+<div id="chatMode" style="display:flex;flex:1">
 <!-- 侧栏 -->
 <div class="sidebar">
   <div class="sidebar-tabs">
@@ -155,6 +166,12 @@ header span{color:#888;font-size:12px}
     <input type="text" id="queryInput" placeholder="输入问题…" autofocus>
     <button id="sendBtn">发送</button>
   </div>
+</div>
+</div>
+
+<!-- ADSR 编辑器模式 -->
+<div id="adsrMode">
+  <iframe src="/static/adsr-editor.html" title="ADSR 包络编辑器" style="width:100%;height:100%;border:none;display:block"></iframe>
 </div>
 </div>
 
@@ -214,6 +231,14 @@ async function testKey(){
 function showTestRes(text,bg,color){
   var r=document.getElementById('sTestResult');
   r.style.display='block';r.style.background=bg;r.style.color=color;r.textContent=text;
+}
+
+// === 模式切换 (问答 / ADSR) ===
+function switchMode(mode) {
+  document.querySelectorAll('.mode-btn').forEach(function(b){b.classList.remove('active')});
+  document.querySelector('.mode-btn[data-mode="'+mode+'"]').classList.add('active');
+  document.getElementById('chatMode').style.display = mode === 'chat' ? 'flex' : 'none';
+  document.getElementById('adsrMode').style.display = mode === 'adsr' ? 'flex' : 'none';
 }
 
 // === Tab 切换 ===

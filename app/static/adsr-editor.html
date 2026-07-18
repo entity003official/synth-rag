@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ADSR 包络可视化编辑器</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  background:#0a0a0f;
+  color:#d0d0e0;
+  font-family:-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  min-height:100vh;
+  padding:16px
+}
+.container{
+  background:linear-gradient(160deg,#12121c,#1a1a28);
+  border-radius:24px;
+  padding:32px;
+  max-width:960px;
+  width:100%;
+  box-shadow:0 24px 80px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.04);
+  border:1px solid #28283c
+}
+header{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:8px}
+header h1{
+  font-size:22px;font-weight:700;
+  background:linear-gradient(135deg,#e8e0ff,#a0a0ff);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  letter-spacing:1px
+}
+header h1 span{font-weight:300;opacity:.6}
+header .sub{font-size:13px;color:#7878a0;letter-spacing:.3px}
+header .sub em{color:#8888cc;font-style:normal}
+
+.canvas-wrap{
+  position:relative;
+  background:radial-gradient(ellipse at 30% 40%,#141425,#0c0c14);
+  border-radius:16px;
+  border:1px solid #28283c;
+  margin:16px 0 14px;
+  overflow:hidden
+}
+#adsrCanvas{display:block;width:100%;height:auto;cursor:default;touch-action:none}
+
+/* --- 参数数值条 --- */
+.param-row{
+  display:flex;gap:12px;margin-bottom:16px;
+  flex-wrap:wrap
+}
+.param-item{
+  flex:1;min-width:120px;
+  background:#1a1a2a;border-radius:10px;
+  padding:10px 14px;
+  border:1px solid #28283c;
+  display:flex;flex-direction:column;gap:4px
+}
+.param-item .label{
+  font-size:11px;text-transform:uppercase;letter-spacing:.8px;
+  display:flex;justify-content:space-between;align-items:center
+}
+.param-item .label .name{color:#8888b0}
+.param-item .label .val{font-weight:700;font-size:13px;font-variant-numeric:tabular-nums}
+.param-item .track{
+  position:relative;height:4px;border-radius:2px;background:#28283c;margin-top:2px
+}
+.param-item .track .fill{
+  position:absolute;top:0;left:0;height:100%;border-radius:2px;
+  transition:width .08s
+}
+/* stage colors */
+.param-a .val,.param-a .track .fill{color:#ff7b3a;background:#ff7b3a}
+.param-d .val,.param-d .track .fill{color:#43d685;background:#43d685}
+.param-s .val,.param-s .track .fill{color:#5b8dff;background:#5b8dff}
+.param-r .val,.param-r .track .fill{color:#c75bff;background:#c75bff}
+
+.param-a .label .name{color:#ff7b3a}
+.param-d .label .name{color:#43d685}
+.param-s .label .name{color:#5b8dff}
+.param-r .label .name{color:#c75bff}
+
+/* --- 音色匹配区 --- */
+.timbre-section{
+  background:linear-gradient(135deg,#16162a,#1c1c30);
+  border-radius:16px;
+  border:1px solid #28283c;
+  padding:18px 20px 20px
+}
+.timbre-section .section-title{
+  font-size:13px;color:#7878a0;letter-spacing:1px;margin-bottom:12px;
+  display:flex;align-items:center;gap:8px
+}
+.timbre-section .section-title .icon{font-size:16px}
+.timbre-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(130px,1fr));
+  gap:8px
+}
+.timbre-card{
+  background:#1a1a2e;border:1px solid #28283c;
+  border-radius:10px;padding:10px 12px;
+  cursor:default;transition:all .2s;
+  position:relative;overflow:hidden
+}
+.timbre-card .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:2px}
+.timbre-card .icon-label{font-size:13px;font-weight:600;color:#e0e0f0}
+.timbre-card .icon-label .emoji{margin-right:4px}
+.timbre-card .score{
+  font-size:14px;font-weight:700;font-variant-numeric:tabular-nums
+}
+.timbre-card .desc{font-size:11px;color:#7878a0;line-height:1.3}
+.timbre-card .score-bar{
+  position:absolute;bottom:0;left:0;height:2px;border-radius:0 2px 0 0;
+  transition:width .25s
+}
+.timbre-card.best{
+  border-color:#5b8dff;background:#1a1a38;
+  box-shadow:0 0 20px rgba(91,141,255,.08)
+}
+.timbre-card.best .icon-label{color:#8ab4ff}
+
+/* score tiers */
+.score-high{color:#43d685}
+.score-mid{color:#d4b05d}
+.score-low{color:#7878a0}
+.score-lowest{color:#55556a}
+
+/* --- 推荐标签 --- */
+.best-label{
+  display:inline-block;
+  font-size:10px;font-weight:700;letter-spacing:.5px;
+  padding:2px 8px;border-radius:4px;
+  background:linear-gradient(135deg,#5b8dff,#7b5dff);color:#fff;
+  margin-top:10px
+}
+.recommend-text{
+  margin-top:10px;font-size:13px;color:#b0b0d0;
+  line-height:1.5
+}
+.recommend-text strong{color:#d0d0ff}
+
+/* responsive */
+@media(max-width:640px){
+  .container{padding:16px;border-radius:16px}
+  header{flex-direction:column;gap:2px}
+  header h1{font-size:18px}
+  .param-item{min-width:calc(50% - 6px)}
+  .timbre-grid{grid-template-columns:repeat(auto-fill,minmax(100px,1fr))}
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+<header>
+  <h1>🎛 包络发生器 <span>· ADSR</span></h1>
+  <div class="sub">拖拽曲线控制点 · <em>实时塑形</em></div>
+</header>
+
+<div class="canvas-wrap">
+  <canvas id="adsrCanvas"></canvas>
+</div>
+
+<div class="param-row">
+  <div class="param-item param-a">
+    <div class="label"><span class="name">ATTACK</span><span class="val" id="valA">0.12s</span></div>
+    <div class="track"><div class="fill" id="barA" style="width:12%"></div></div>
+  </div>
+  <div class="param-item param-d">
+    <div class="label"><span class="name">DECAY</span><span class="val" id="valD">0.30s</span></div>
+    <div class="track"><div class="fill" id="barD" style="width:20%"></div></div>
+  </div>
+  <div class="param-item param-s">
+    <div class="label"><span class="name">SUSTAIN</span><span class="val" id="valS">72%</span></div>
+    <div class="track"><div class="fill" id="barS" style="width:72%"></div></div>
+  </div>
+  <div class="param-item param-r">
+    <div class="label"><span class="name">RELEASE</span><span class="val" id="valR">0.50s</span></div>
+    <div class="track"><div class="fill" id="barR" style="width:25%"></div></div>
+  </div>
+</div>
+
+<div class="timbre-section">
+  <div class="section-title">
+    <span class="icon">🎵</span> 音色匹配 · 当前 ADSR 最适合
+  </div>
+  <div class="timbre-grid" id="timbreGrid"></div>
+  <div class="recommend-text" id="recommendText"></div>
+</div>
+
+</div>
+
+<script>
+(function(){
+  // --- defaults ---
+  const P = {
+    attack: 0.12,   // seconds
+    decay: 0.30,
+    sustain: 0.72,  // 0-1
+    release: 0.50
+  };
+
+  const HOLD_TIME = 0.5;  // visual sustain horizon in seconds
+
+  // --- config ranges ---
+  const RANGES = {
+    attack:  { min: 0.002, max: 3.0, default: 0.12 },
+    decay:   { min: 0.002, max: 3.0, default: 0.30 },
+    sustain: { min: 0,     max: 1.0, default: 0.72 },
+    release: { min: 0.002, max: 5.0, default: 0.50 }
+  };
+
+  // --- sound profiles from knowledge base ---
+  const PROFILES = [
+    { id:'lead',  label:'Lead',  emoji:'🎤', desc:'穿透有力的旋律主奏',
+      A:.08, D:.15, S:.85, R:.3,  hint:'快速音头 + 高 Sustain → 音头清晰、延音饱满，旋律线条突出' },
+    { id:'bass',  label:'Bass',  emoji:'🎸', desc:'紧凑稳定的低频支撑',
+      A:.05, D:.10, S:.90, R:.2,  hint:'较快 Attack + 高 Sustain → 低频紧实有弹性，适合律动' },
+    { id:'pad',   label:'Pad',   emoji:'☁️', desc:'延绵氛围的铺底',
+      A:.8,  D:.5,  S:.60, R:1.2, hint:'慢速 Attack + 长 Release → 声音缓缓铺开、柔和不突兀' },
+    { id:'synth', label:'Synth', emoji:'✨', desc:'个性鲜明的合成音色',
+      A:.10, D:.18, S:.75, R:.35, hint:'ADSR 调节灵活，介于 Lead 与 Pad 之间' },
+    { id:'chord', label:'Chord', emoji:'🎹', desc:'和声饱满的和弦伴奏',
+      A:.08, D:.12, S:.80, R:.30, hint:'较快 Attack + 中高 Sustain → 和弦清晰不混浊' },
+    { id:'bell',  label:'Bell',  emoji:'🔔', desc:'清脆回荡的金属铃音',
+      A:.005,D:.8,  S:.05, R:.10, hint:'极快 Attack + 长 Decay + 低 Sustain → 音头锐利、自然衰减' },
+    { id:'pluck', label:'Pluck', emoji:'🎻', desc:'快速衰减的拨奏感',
+      A:.003,D:.08, S:.05, R:.05, hint:'瞬间 Attack + 短 Decay + 低 Sustain → 干净利落的拨弦' }
+  ];
+
+  // --- canvas ---
+  const canvas = document.getElementById('adsrCanvas');
+  const ctx = canvas.getContext('2d');
+  let W, H, dpr;
+  const PAD = { top: 28, right: 24, bottom: 32, left: 34 };
+
+  // --- drag state ---
+  let dragTarget = null;  // 'attack' | 'decay' | 'release' | null
+  let dragStartX = 0, dragStartY = 0;
+  let dragStartVal = 0;
+  let dragStartDecay = 0, dragStartSustain = 0;
+
+  // --- DOM refs ---
+  const valA = document.getElementById('valA');
+  const valD = document.getElementById('valD');
+  const valS = document.getElementById('valS');
+  const valR = document.getElementById('valR');
+  const barA = document.getElementById('barA');
+  const barD = document.getElementById('barD');
+  const barS = document.getElementById('barS');
+  const barR = document.getElementById('barR');
+  const timbreGrid = document.getElementById('timbreGrid');
+  const recommendText = document.getElementById('recommendText');
+
+  // --- helpers ---
+  function clamp(v, lo, hi) { return Math.min(Math.max(v, lo), hi); }
+
+  function logNorm(val, min, max) {
+    const lv = Math.log(val), lmin = Math.log(min), lmax = Math.log(max);
+    return clamp((lv - lmin) / (lmax - lmin), 0, 1);
+  }
+
+  function formatTime(v) {
+    const s = v < 0.01 ? v.toFixed(4) : v < 0.1 ? v.toFixed(3) : v.toFixed(2);
+    return s.replace(/\.?0+$/, '') + 's';
+  }
+
+  // --- get plot coords ---
+  function totalTime() { return P.attack + P.decay + HOLD_TIME + P.release; }
+
+  function getPlotCoords() {
+    const pw = W - PAD.left - PAD.right;
+    const ph = H - PAD.top - PAD.bottom;
+    const tt = totalTime();
+    const x0 = PAD.left, y0 = PAD.top + ph;  // origin (bottom-left)
+    const sx = pw / tt;  // seconds to pixels
+    const sy = ph;       // 0-1 to pixels
+
+    const pts = {
+      start:   { x: x0,                          y: y0 },
+      peak:    { x: x0 + P.attack * sx,          y: PAD.top },
+      decay:   { x: x0 + (P.attack+P.decay)*sx, y: y0 - P.sustain * sy },
+      sHold:   { x: x0 + (P.attack+P.decay+HOLD_TIME)*sx, y: y0 - P.sustain * sy },
+      release: { x: x0 + tt * sx,                y: y0 }
+    };
+    return { pts, pw, ph, sx, sy, x0, y0 };
+  }
+
+  // --- resize ---
+  function resize() {
+    const wrap = canvas.parentElement;
+    const rect = wrap.getBoundingClientRect();
+    dpr = window.devicePixelRatio || 1;
+    W = rect.width * dpr;
+    H = Math.max(220, Math.min(360, W * 0.5)) * dpr;
+    canvas.width = W;
+    canvas.height = H;
+    canvas.style.width = (W/dpr) + 'px';
+    canvas.style.height = (H/dpr) + 'px';
+  }
+
+  // --- draw ---
+  function draw() {
+    const ph = H - PAD.top - PAD.bottom;
+    const { pts, pw, sx, sy, x0, y0 } = getPlotCoords();
+    const p = pts;
+
+    ctx.clearRect(0, 0, W, H);
+
+    // ---- grid ----
+    ctx.save();
+    ctx.strokeStyle = '#1f1f35';
+    ctx.lineWidth = 1 * dpr;
+    ctx.setLineDash([3*dpr, 4*dpr]);
+    const gridLines = 5;
+    for (let i = 1; i < gridLines; i++) {
+      const y = PAD.top + (ph / gridLines) * i;
+      ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(W - PAD.right, y); ctx.stroke();
+    }
+    ctx.restore();
+
+    // ---- envelope fill ----
+    ctx.save();
+    const grad = ctx.createLinearGradient(0, PAD.top, 0, y0);
+    grad.addColorStop(0, 'rgba(91,141,255,0.25)');
+    grad.addColorStop(0.5, 'rgba(91,141,255,0.08)');
+    grad.addColorStop(1, 'rgba(91,141,255,0.01)');
+    ctx.beginPath();
+    ctx.moveTo(p.start.x, p.start.y);
+    ctx.lineTo(p.peak.x, p.peak.y);
+    ctx.lineTo(p.decay.x, p.decay.y);
+    ctx.lineTo(p.sHold.x, p.sHold.y);
+    ctx.lineTo(p.release.x, p.release.y);
+    ctx.lineTo(p.start.x, p.start.y);
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+    ctx.restore();
+
+    // ---- phase segments (colored) ----
+    const drawSegment = (x1, y1, x2, y2, color, width) => {
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width || 2.5 * dpr;
+      ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+      ctx.restore();
+    };
+    const segW = 3 * dpr;
+
+    // Attack (orange)
+    drawSegment(p.peak.x, p.peak.y, p.start.x, p.start.y, '#ff7b3a', segW);
+    // Decay (green)
+    drawSegment(p.peak.x, p.peak.y, p.decay.x, p.decay.y, '#43d685', segW);
+    // Sustain (blue)
+    drawSegment(p.decay.x, p.decay.y, p.sHold.x, p.sHold.y, '#5b8dff', segW);
+    // Release (purple)
+    drawSegment(p.sHold.x, p.sHold.y, p.release.x, p.release.y, '#c75bff', segW);
+
+    // ---- envelope outline on top ----
+    ctx.save();
+    ctx.strokeStyle = 'rgba(200,210,255,0.5)';
+    ctx.lineWidth = 1.2 * dpr;
+    ctx.beginPath();
+    ctx.moveTo(p.start.x, p.start.y);
+    ctx.lineTo(p.peak.x, p.peak.y);
+    ctx.lineTo(p.decay.x, p.decay.y);
+    ctx.lineTo(p.sHold.x, p.sHold.y);
+    ctx.lineTo(p.release.x, p.release.y);
+    ctx.stroke();
+    ctx.restore();
+
+    // ---- stage labels ----
+    const labelFont = `${Math.round(11*dpr)}px -apple-system,sans-serif`;
+    ctx.save();
+    ctx.font = labelFont;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+
+    const lblY = y0 + 8*dpr;
+    ctx.fillStyle = '#ff7b3a';
+    ctx.fillText('ATTACK', (p.start.x + p.peak.x) / 2, lblY);
+
+    ctx.fillStyle = '#43d685';
+    ctx.fillText('DECAY', (p.peak.x + p.decay.x) / 2, lblY);
+
+    ctx.fillStyle = '#5b8dff';
+    ctx.fillText('SUSTAIN', (p.decay.x + p.sHold.x) / 2, lblY);
+
+    ctx.fillStyle = '#c75bff';
+    ctx.fillText('RELEASE', (p.sHold.x + p.release.x) / 2, lblY);
+    ctx.restore();
+
+    // ---- control handles ----
+    const handles = [
+      { key:'attack',  cx: p.peak.x,    cy: p.peak.y,    color:'#ff7b3a', label:'A' },
+      { key:'decay',   cx: p.decay.x,   cy: p.decay.y,   color:'#43d685', label:'D/S' },
+      { key:'release', cx: p.release.x, cy: p.release.y, color:'#c75bff', label:'R' }
+    ];
+
+    const hR = 8 * dpr;
+    for (const h of handles) {
+      // glow
+      const gg = ctx.createRadialGradient(h.cx, h.cy, 0, h.cx, h.cy, hR*2.5);
+      gg.addColorStop(0, h.color + '55');
+      gg.addColorStop(1, h.color + '00');
+      ctx.save();
+      ctx.fillStyle = gg;
+      ctx.beginPath(); ctx.arc(h.cx, h.cy, hR*2.5, 0, Math.PI*2); ctx.fill();
+      ctx.restore();
+
+      // outer ring
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+      ctx.lineWidth = 1.5 * dpr;
+      ctx.beginPath(); ctx.arc(h.cx, h.cy, hR + 2*dpr, 0, Math.PI*2); ctx.stroke();
+      ctx.restore();
+
+      // filled circle
+      ctx.save();
+      ctx.fillStyle = h.color;
+      ctx.shadowColor = h.color + '66';
+      ctx.shadowBlur = 10 * dpr;
+      ctx.beginPath(); ctx.arc(h.cx, h.cy, hR, 0, Math.PI*2); ctx.fill();
+      ctx.restore();
+
+      // white center dot
+      ctx.save();
+      ctx.fillStyle = '#fff';
+      ctx.shadowColor = 'transparent';
+      ctx.beginPath(); ctx.arc(h.cx, h.cy, hR*0.35, 0, Math.PI*2); ctx.fill();
+      ctx.restore();
+
+      // label
+      ctx.save();
+      ctx.font = `${Math.round(9*dpr)}px -apple-system,sans-serif`;
+      ctx.fillStyle = h.color;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText(h.label, h.cx, h.cy - hR - 4*dpr);
+      ctx.restore();
+    }
+
+    // ---- Y axis label ----
+    ctx.save();
+    ctx.fillStyle = '#55556a';
+    ctx.font = `${Math.round(10*dpr)}px -apple-system,sans-serif`;
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('100%', PAD.left - 6*dpr, PAD.top);
+    ctx.fillText('0%',   PAD.left - 6*dpr, y0);
+    ctx.restore();
+  }
+
+  // --- update param display ---
+  function updateParams() {
+    valA.textContent = formatTime(P.attack);
+    valD.textContent = formatTime(P.decay);
+    valS.textContent = Math.round(P.sustain * 100) + '%';
+    valR.textContent = formatTime(P.release);
+
+    barA.style.width = (logNorm(P.attack, RANGES.attack.min, RANGES.attack.max) * 100) + '%';
+    barD.style.width = (logNorm(P.decay, RANGES.decay.min, RANGES.decay.max) * 100) + '%';
+    barS.style.width = (P.sustain * 100) + '%';
+    barR.style.width = (logNorm(P.release, RANGES.release.min, RANGES.release.max) * 100) + '%';
+  }
+
+  // --- timbre matching ---
+  function matchTimbre() {
+    // Weighted log-distance for time params, linear for sustain
+    const a_n = logNorm(P.attack, RANGES.attack.min, RANGES.attack.max);
+    const d_n = logNorm(P.decay,  RANGES.decay.min,  RANGES.decay.max);
+    const s_n = P.sustain;
+    const r_n = logNorm(P.release, RANGES.release.min, RANGES.release.max);
+
+    const scored = PROFILES.map(prof => {
+      const pa_n = logNorm(prof.A, RANGES.attack.min, RANGES.attack.max);
+      const pd_n = logNorm(prof.D, RANGES.decay.min, RANGES.decay.max);
+      const ps_n = prof.S;
+      const pr_n = logNorm(prof.R, RANGES.release.min, RANGES.release.max);
+
+      // weighted differences
+      const w = { A:0.3, D:0.2, S:0.3, R:0.2 };
+      const dist = Math.sqrt(
+        w.A * (a_n - pa_n)**2 +
+        w.D * (d_n - pd_n)**2 +
+        w.S * (s_n - ps_n)**2 +
+        w.R * (r_n - pr_n)**2
+      );
+      const score = clamp(1 - dist * 1.4, 0, 1);
+      return { ...prof, score };
+    });
+
+    scored.sort((a, b) => b.score - a.score);
+    return scored;
+  }
+
+  function getScoreClass(s) {
+    if (s >= 0.75) return 'score-high';
+    if (s >= 0.5)  return 'score-mid';
+    if (s >= 0.25) return 'score-low';
+    return 'score-lowest';
+  }
+
+  function renderTimbre() {
+    const results = matchTimbre();
+    const best = results[0];
+
+    timbreGrid.innerHTML = '';
+    for (const r of results) {
+      const card = document.createElement('div');
+      card.className = 'timbre-card' + (r === best ? ' best' : '');
+      const pct = Math.round(r.score * 100);
+      card.innerHTML = `
+        <div class="top">
+          <span class="icon-label"><span class="emoji">${r.emoji}</span>${r.label}</span>
+          <span class="score ${getScoreClass(r.score)}">${pct}%</span>
+        </div>
+        <div class="desc">${r.desc}</div>
+        <div class="score-bar" style="width:${pct}%;background:${r === best ? '#5b8dff' : '#38385a'}"></div>
+      `;
+      timbreGrid.appendChild(card);
+    }
+
+    if (best && best.score > 0.15) {
+      const pct = Math.round(best.score * 100);
+      recommendText.innerHTML = `
+        <span class="best-label">◆ 推荐</span><br>
+        当前 ADSR 最接近 <strong>${best.emoji} ${best.label}</strong>（匹配度 ${pct}%）<br>
+        <span style="color:#8888b0;font-size:12px">${best.hint}</span>
+      `;
+    } else {
+      recommendText.textContent = '当前 ADSR 设置较为特殊，未匹配到典型音色类型。';
+    }
+  }
+
+  // --- full update ---
+  function updateAll() {
+    draw();
+    updateParams();
+    renderTimbre();
+  }
+
+  // --- hit testing ---
+  function hR() { return 16 * dpr; }  // hit radius
+
+  function hitTest(mx, my) {
+    const { pts } = getPlotCoords();
+    const p = pts;
+    const tests = [
+      { key:'attack',  x: p.peak.x,    y: p.peak.y },
+      { key:'decay',   x: p.decay.x,   y: p.decay.y },
+      { key:'release', x: p.release.x, y: p.release.y }
+    ];
+    const hr = hR();
+    for (const t of tests) {
+      const dx = mx - t.x, dy = my - t.y;
+      if (dx*dx + dy*dy <= hr*hr) return t.key;
+    }
+    return null;
+  }
+
+  // --- mouse / touch coords ---
+  function getPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    let cx, cy;
+    if (e.touches) {
+      cx = e.touches[0].clientX;
+      cy = e.touches[0].clientY;
+    } else {
+      cx = e.clientX;
+      cy = e.clientY;
+    }
+    // device pixel ratio
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    return {
+      x: (cx - rect.left) * scaleX,
+      y: (cy - rect.top) * scaleY
+    };
+  }
+
+  // --- event handlers ---
+  function onDown(e) {
+    e.preventDefault();
+    const pos = getPos(e);
+    const hit = hitTest(pos.x, pos.y);
+    if (!hit) return;
+    dragTarget = hit;
+    dragStartX = pos.x;
+    dragStartY = pos.y;
+    if (hit === 'decay') {
+      dragStartDecay = P.decay;
+      dragStartSustain = P.sustain;
+    } else {
+      dragStartVal = P[hit];
+    }
+    canvas.style.cursor = 'grabbing';
+  }
+
+  function onMove(e) {
+    e.preventDefault();
+    const pos = getPos(e);
+    if (dragTarget) {
+      const { pts, pw, ph, sx, sy, x0, y0 } = getPlotCoords();
+      const dx = pos.x - dragStartX;
+      const dy = pos.y - dragStartY;
+      const tt = totalTime();
+
+      switch (dragTarget) {
+        case 'attack': {
+          // constrain: min attack time, max can't go past decay point - epsilon
+          const secChange = dx / sx;
+          const newVal = clamp(dragStartVal + secChange, RANGES.attack.min, totalTime() - RANGES.decay.min - 0.01);
+          P.attack = newVal;
+          break;
+        }
+        case 'decay': {
+          // x → decay time, y → sustain level (tracked independently from drag start)
+          const secChange = dx / sx;
+          const newD = clamp(dragStartDecay + secChange, RANGES.decay.min, totalTime() - P.attack - HOLD_TIME - 0.01);
+          P.decay = newD;
+
+          const susChange = -dy / ph;
+          const newS = clamp(dragStartSustain + susChange, 0, 1);
+          P.sustain = newS;
+          break;
+        }
+        case 'release': {
+          const secChange = dx / sx;
+          const newVal = clamp(dragStartVal + secChange, RANGES.release.min, 5.0);
+          P.release = newVal;
+          break;
+        }
+      }
+      updateAll();
+    } else {
+      // cursor feedback
+      const h = hitTest(pos.x, pos.y);
+      canvas.style.cursor = h ? 'grab' : 'default';
+    }
+  }
+
+  function onUp(e) {
+    if (dragTarget) {
+      dragTarget = null;
+      canvas.style.cursor = 'default';
+    }
+  }
+
+  // --- attach events ---
+  canvas.addEventListener('mousedown', onDown);
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('mouseup', onUp);
+
+  canvas.addEventListener('touchstart', onDown, { passive: false });
+  window.addEventListener('touchmove', onMove, { passive: false });
+  window.addEventListener('touchend', onUp, { passive: false });
+
+  window.addEventListener('blur', onUp);
+
+  window.addEventListener('resize', () => {
+    resize();
+    updateAll();
+  });
+
+  // --- init ---
+  resize();
+  updateAll();
+
+})();
+</script>
+</body>
+</html>
